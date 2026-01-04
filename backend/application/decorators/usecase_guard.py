@@ -24,6 +24,7 @@ def handle_usecase_errors(f):
             
             msg = f"Dato inválido en '{campo}': {detalle}"
             return OperationResult(False, msg, None)
+        
         except NoteDomainError as e:
             return OperationResult(False, str(e), None)
         
