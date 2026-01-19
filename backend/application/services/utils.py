@@ -1,11 +1,13 @@
 import re
-
-def generate_unique_name(base_name: str, existing_names: list[str]) -> str:
-    if base_name not in existing_names:
-        return base_name
-    """
-    Cuando le pase un nombre, detecte sí está ahi en la lista y si lo está. Entonces que devuelve un nombre con el - copia
-    """
+"""
+Generate a unique name by appending a numeric suffix if needed.
+E.g., "name", "name (2)", "name (3)", etc.
+"""
+def generate_unique_name(base_name: str, sibling_names: list[str]) -> str:
+    clean_name = base_name.strip()
+    if clean_name not in sibling_names:
+        return clean_name
+    
     def find_missing_number(nums: list[int]) -> int:
         if not nums:
             return 2
@@ -16,15 +18,15 @@ def generate_unique_name(base_name: str, existing_names: list[str]) -> str:
             counter+=1
         return counter
     
-    pattern = re.compile(rf"^{re.escape(base_name)} \((\d+)\)$")
+    pattern = re.compile(rf"^{re.escape(clean_name)} \((\d+)\)$")
 
-    sufijos_usados = []
-    for name in existing_names:
+    used_suffixes = []
+    for name in sibling_names:
         match = pattern.match(name)
         if match:
-            sufijos_usados.append(int(match.group(1)))
+            used_suffixes.append(int(match.group(1)))
 
-    proximo_sufijo = find_missing_number(sufijos_usados)
+    proximo_sufijo = find_missing_number(used_suffixes)
     
-    return f"{base_name} ({proximo_sufijo})"
+    return f"{clean_name} ({proximo_sufijo})"
 

@@ -1,5 +1,5 @@
 import re
-from typing import TypedDict, Optional, Any, Callable
+from typing import TypedDict, Optional, Any
 import tkinter as tk
 from tkinter import ttk
 from frontend.core.bus import Bus
@@ -12,6 +12,18 @@ class MatchData(TypedDict):
     inner_end: int
     text: str
 
+# -----------------
+
+MARKDOWN_PATTERNS = {
+            "h_all": r'^(#{1,6})\s+(.*)$', 
+            "bold": r'\*\*(.+?)\*\*',   
+            "italic": r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', # 
+            "strike": r'~~(.+?)~~',       
+            "code_inline": r'`([^`\n]+?)`' 
+        }
+    
+INLINE_FORMATS = ["code_inline", "bold", "strike", "italic"]
+
 # ------------------
 class RenderedMarkdown:
     @staticmethod
@@ -21,7 +33,7 @@ class RenderedMarkdown:
         in the given text.
 
         Args:
-            body_text: The portion of text where to search for matches (e.g., the content 
+            raw_text: The portion of text where to search for matches (e.g., the content 
             of a line or the body of a header).
 
         Returns:
@@ -78,7 +90,7 @@ class RenderedMarkdown:
         Main function to find and sort format matches online.
 
         Args:
-            body_text: Text where to find the format.
+            raw_text: Text where to find the format.
 
         Returns:
             Sorted and filtered list of matches.
@@ -217,8 +229,6 @@ class RenderedMarkdown:
             header_pattern = re.compile(MARKDOWN_PATTERNS["h_all"])
 
             for raw_line in raw_lines:
-                #print("Abs_pos : ", abs_pos)
-
                 header_match = header_pattern.match(raw_line)
                 if header_match:
                     body_text = header_match.group(2)
@@ -228,69 +238,41 @@ class RenderedMarkdown:
                     body_text = raw_line
                     body_start_raw_idx = 0
                     header_level = 0
-                #print("Body_text          : ", body_text)
-                #print("Body_start_raw_idx : ", body_start_raw_idx)
-                #print("Header_level       : ", header_level)
-
-                #print("Find and order matches ... ")
                 matches = RenderedMarkdown.find_and_order_matches(body_text)
-                #print("Matches            : ", matches)
-
-                #print("Build previw line and raw to preview mapping ... ")
                 preview_line, raw_to_preview_line_map = RenderedMarkdown.build_preview_line_and_raw_to_preview_mapping(body_text, matches)
-                #print("Preview_line           : ", preview_line)
-                #print("Raw_to_preview_line_map:, ", raw_to_preview_line_map)
 
-                #4. Agg headers
                 if header_level > 0:
                     raw_to_preview_line_map = [0] * body_start_raw_idx + raw_to_preview_line_map
-                #print("Agg if headers ...")
-                #print("Raw_to_preview_line_map: ", raw_to_preview_line_map)
-                #5. build spans
-                #print("Build spans ...")
+
                 line_spans = RenderedMarkdown.build_line_spans(
                 preview_line, 
                 matches, 
-                raw_to_preview_line_map, # Mapeo corregido (si es encabezado) o normal (si no)
+                raw_to_preview_line_map, 
                 body_start_raw_idx, 
                 header_level
                 )
-                #print("Line Spans : ", line_spans)
 
                 for tag, start_rel, end_rel in line_spans:
                     absolute_spans.append((tag, abs_pos + start_rel, abs_pos + end_rel))
 
-                # save line and map (convert raw_to_preview to absolute)
                 abs_map = [abs_pos + v for v in raw_to_preview_line_map]
                 raw_to_preview_maps.append(abs_map)
                 
                 preview_lines.append(preview_line)
                 abs_pos += len(preview_line) + 1
 
-            # join lines with newline
             preview_text = "\n".join(preview_lines)
             return preview_text, raw_to_preview_maps, absolute_spans
 
-MARKDOWN_PATTERNS = {
-            "h_all": r'^(#{1,6})\s+(.*)$', 
-            "bold": r'\*\*(.+?)\*\*',   
-            "italic": r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', # 
-            "strike": r'~~(.+?)~~',       
-            "code_inline": r'`([^`\n]+?)`' 
-        }
-    
-INLINE_FORMATS = ["code_inline", "bold", "strike", "italic"]
-
 
 class MarkdownEditorFeature(ttk.Frame):
-    """
-    Feature: MarkdownEditor
-    Contenedor (Frame) que encapsula el widget de texto y su scrollbar.
+    """Text widget with Markdown editing and preview capabilities.
+    The kwargs are passed to the internal tk.Text widget.
     """
     def __init__(self, master, id_note, **kwargs):
         super().__init__(master)
         self.id_note = id_note
-        # Estado interno
+        # State variables
         self.preview_mode = False
         self._markdown_text = ""
         self._markdown_cursor_position = "1.0"
@@ -300,12 +282,11 @@ class MarkdownEditorFeature(ttk.Frame):
         self._setup_tags()
         self._setup_events()
         
-
     def _create_widgets(self, text_kwargs):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-        # El widget de texto real
+        # widget Text
         params = {
             "wrap": "word",
             "font": ("Segoe UI", 11),
@@ -318,7 +299,7 @@ class MarkdownEditorFeature(ttk.Frame):
         self.text = tk.Text(self, **params)
         self.text.grid(row=0, column=0, sticky="nsew")
 
-        # Scrollbar integrada
+        # Scrollbar 
         self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.text.yview)
         self.text.configure(yscrollcommand=self.scrollbar.set)
         self.scrollbar.grid(row=0, column=1, sticky="ns")
@@ -340,9 +321,7 @@ class MarkdownEditorFeature(ttk.Frame):
         self.text.bind("<Control-e>", self.toggle_preview)
         self.text.bind("<Control-E>", self.toggle_preview)
 
-    # --- API PÚBLICA (Proxy de métodos de tk.Text) ---
-    # Esto permite que el NoteEditor use .get(), .insert(), etc.
-
+    # This allows the NoteEditor to use .get(), .insert(), etc.
     def get(self, *args, **kwargs): 
         return self.text.get(*args, **kwargs)
     def insert(self, *args, **kwargs): 
@@ -356,8 +335,6 @@ class MarkdownEditorFeature(ttk.Frame):
     def mark_set(self, *args, **kwargs): 
         return self.text.mark_set(*args, **kwargs)
 
-    # --- LÓGICA DE PREVIEW ---
-
     def toggle_preview(self, event=None) -> str:
         """Switches between Markdown editing mode and preview mode."""
         if not self.preview_mode:
@@ -369,26 +346,26 @@ class MarkdownEditorFeature(ttk.Frame):
         return "break"
 
     def _enter_preview_mode(self):
-        # Obtener el texto sin formato actual
+        # Is obtained the current Markdown text
         self._markdown_text = self.text.get("1.0", "end-1c")
-        # Obtener la pocición actual del cursor
+        # Save current cursor position
         self._markdown_cursor_position = self.text.index("insert")
 
-        # Construir el texto de vista previa y los mapas
+        # Buids the preview text, maps and spans
         preview_text, maps, spans = self._build_preview_and_maps(self._markdown_text)
         self._markdown_to_render_map = maps
 
-        # Borramos el texto completo actual
+        # Delete current text
         self.text.delete("1.0", "end")
 
-        # Insertamos el nuevo texto limpio
+        # Insert the preview text
         self.text.insert("1.0", preview_text)
         
-        # Removemos los formatos
+        # Remove all previous tags
         for tag in ("h1","h2","h3","h4","h5","h6","bold","italic","strike","code_inline"):
             self.text.tag_remove(tag, "1.0", "end")
 
-        # Aplicamos los formatos
+        # Apply the spans
         for tagname, start_abs, end_abs in spans:
             if end_abs > start_abs:
                 try:
@@ -397,6 +374,7 @@ class MarkdownEditorFeature(ttk.Frame):
                     pass
 
         try:
+            # obtain the preview cursor position
             pr_pos = self._map_raw_index_to_preview(self._markdown_cursor_position)
             self.text.mark_set("insert", f"1.0+{pr_pos}c")
             self.text.see("insert")
@@ -415,15 +393,15 @@ class MarkdownEditorFeature(ttk.Frame):
             self.text.see("insert")
         except: pass
 
-    # --- ALGORITMO DE PARSEO (Privado) ---
+    # --- ALGORITHM---
     def _build_preview_and_maps(self, raw_text: str):
         return RenderedMarkdown.build_preview_and_maps(raw_text)
 
     def _map_raw_index_to_preview(self, raw_index):
         """
-        Map a tk index in raw text like '3.5' to an
-        absolute preview char index using self._raw2preview_maps.
-        Returns and integer absolute char index (0-based)
+        Converts a Tkinter index (line.column) from raw markdown text
+        into a global index of the rendered text, usable for positioning
+        the cursor in a Text widget.
         """
 
         if not self._markdown_to_render_map: 
@@ -442,7 +420,7 @@ class MarkdownEditorFeature(ttk.Frame):
         return amap[col]
 
     def get_markdown(self) -> str:
-        """Devuelve el Markdown fuente, sin importar el modo."""
+        """Returns markdown text"""
         if self.preview_mode:
             return self._markdown_text
         return self.text.get("1.0", "end-1c")

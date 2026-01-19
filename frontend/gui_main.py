@@ -3,13 +3,9 @@ from tkinter import ttk
 from frontend.features.explorer_feature import ExplorerFeature
 from frontend.tab_manager import TabManager
 from frontend.analytics_manager import AnalyticsManager
-"""
-from frontend.explorer.explorer_controller import ExplorerController
-from frontend.explorer.explorer_view import Explorer
-"""
+
 def setup_style():
     style = ttk.Style()
-    # Usamos 'default' para un aspecto limpio o 'alt'
     style.theme_use("default")
 
 
@@ -20,24 +16,24 @@ class Gui():
         setup_style()
         self.root.geometry("1000x600")
 
-        # PanedWindow horizontal
+        # Horizontal PanedWindow
         pw = tk.PanedWindow(self.root, orient="horizontal")
         pw.pack(fill="both", expand=True)
 
-        # Frame IZQUIERDO
+        # Left frame
         frame_left = tk.Frame(pw, width=250, bg="#252526")
         pw.add(frame_left, minsize=200)
 
-        # Frame DERECHO 
+        # Right frame
         frame_right = tk.Frame(pw, width=600, bg="#252526")
         pw.add(frame_right, minsize=200)
 
         
-        # Explorer:
+        # Explorer
         explorer = ExplorerFeature(frame_left)
         explorer.pack(expand=True, fill="both")
 
-        # TabManager:
+        # TabManager
         notebook = ttk.Notebook(frame_right)
         notebook.pack(fill="both", expand=True)
         tab_manager = TabManager(notebook)

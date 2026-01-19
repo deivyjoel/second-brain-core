@@ -3,6 +3,7 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class NoteRecordLiteDTO:
+    """DTO to represent a lightweight note record without content data."""
     id: int
     name: str
     theme_id: int | None

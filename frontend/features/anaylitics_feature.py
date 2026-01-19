@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from datetime import datetime
+from datetime import datetime, timezone
 
 class AnalyticsWindow(tk.Toplevel): 
     def __init__(self, dto):
@@ -11,7 +11,6 @@ class AnalyticsWindow(tk.Toplevel):
         self.frame = AnalyticsFrame(self, dto) 
         self.frame._build_ui()
         self.frame.pack(fill="both", expand=True)
-
 
 
 class AnalyticsFrame(tk.Frame):
@@ -94,4 +93,9 @@ class AnalyticsFrame(tk.Frame):
         return data
 
     def _fmt(self, dt: datetime):
-        return dt.strftime("%d %b %Y")
+        if dt is None:
+            return ""
+        utc_dt = dt.replace(tzinfo=timezone.utc)
+        local_dt = utc_dt.astimezone()
+        
+        return local_dt.strftime("%d %b %Y, %H:%M")

@@ -1,7 +1,7 @@
+from log import logger
 from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from log import logger
 
 from backend.infrastructure.repositories.sql_alchemy import models
 from backend.infrastructure.errors.db import RepositoryError
@@ -12,8 +12,8 @@ class AnalyticsRepository:
         self.session = session
         logger.info("AnalyticsRepository initialized succesfully:: %s", session)
 
-    def get_time_and_note_counts(self, family_ids: list[int], theme_id: int) -> ThemeRawStatsDTO:
-        """Obtiene métricas agregadas de tiempo y notas para toda la rama de un tema."""
+    def get_time_and_note_counts(self, family_theme_ids: list[int], theme_id: int) -> ThemeRawStatsDTO:
+        """Retrieves aggregated time and note metrics for a specified list of themes."""
         try:
             result = (
                 self.session.query(
@@ -23,7 +23,7 @@ class AnalyticsRepository:
                 )
                 .select_from(models.NoteModel)
                 .outerjoin(models.TimeModel, models.NoteModel.id == models.TimeModel.note_id)
-                .filter(models.NoteModel.theme_id.in_(family_ids))
+                .filter(models.NoteModel.theme_id.in_(family_theme_ids))
                 .first()
             )
             
@@ -32,7 +32,7 @@ class AnalyticsRepository:
                 total_notes = result.notes if result else 0,
                 minutes = result.minutes if result else 0,
                 active_days = result.days if result else 0,
-                n_subthemes = len(family_ids) - 1
+                n_subthemes = len(family_theme_ids) - 1
             )
 
         except SQLAlchemyError as e:
@@ -43,7 +43,7 @@ class AnalyticsRepository:
             raise RepositoryError("unexpected_error") from e
 
     def count_direct_notes(self, theme_id: int) -> int:
-        """Cuenta notas que pertenecen exclusivamente al tema padre."""
+        """Counts notes that pertain exclusively to the given theme."""
         try:
             count = (
                 self.session.query(func.count(models.NoteModel.id))
@@ -59,12 +59,12 @@ class AnalyticsRepository:
             logger.exception("count_direct_notes(id=%s) [Unexpected error]", theme_id)
             raise RepositoryError("unexpected_error") from e
 
-    def get_aggregated_content(self, family_ids: list[int], theme_id: int) -> str:
-        """Recupera el contenido de todas las notas de la rama para análisis léxico."""
+    def get_aggregated_content(self, family_theme_ids: list[int], theme_id: int) -> str:
+        """Retrieves the content for lexical analysis."""
         try:
             notes_content = (
                 self.session.query(models.NoteModel.content)
-                .filter(models.NoteModel.theme_id.in_(family_ids))
+                .filter(models.NoteModel.theme_id.in_(family_theme_ids))
                 .all()
             )
             logger.info("get_aggregated_content(theme_id=%s) [Success]", theme_id)

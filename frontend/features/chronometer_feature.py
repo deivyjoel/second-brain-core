@@ -32,12 +32,9 @@ class TimerLogic:
 
     def get_time_record_minutes(self):
         self.stop()
-        # Retorna el tiempo en minutos para la API
         return self.elapsed_time / 60 if self.elapsed_time > 0 else 0
 
-# ==========================================
-# COMPONENTE UI (Feature)
-# ==========================================
+
 class ChronometerFeature(ttk.Frame):
     def __init__(self, parent, note_id: int):
         super().__init__(parent)
@@ -48,11 +45,9 @@ class ChronometerFeature(ttk.Frame):
         self._create_widgets()
 
     def _create_widgets(self):
-        # Estilo de fuente digital
         self.label = ttk.Label(self, text="00:00:00", font=("Consolas", 12, "bold"))
         self.label.pack(side="left", padx=5)
 
-        # Botones con símbolos (puedes usar iconos si prefieres)
         self.btn_toggle = tk.Button(self, text="▷", width=3, command=self.toggle)
         self.btn_toggle.pack(side="left", padx=2)
 
@@ -78,7 +73,6 @@ class ChronometerFeature(ttk.Frame):
             mins, secs = divmod(int(elapsed), 60)
             milis = int((elapsed * 100) % 100)
             self.label.config(text=f"{mins:02}:{secs:02}:{milis:02}")
-            # Se llama a sí mismo cada 50ms para fluidez
             self.after(50, self.actualizar_ui)
 
     def reiniciar(self):
@@ -94,7 +88,6 @@ class ChronometerFeature(ttk.Frame):
             
             if res.successful:
                 self.reiniciar()
-                Bus.emit("TIME_UPDATED", note_id=self.note_id)
                 messagebox.showinfo("Éxito", res.info)
             else:
                 messagebox.showerror("Error cronómetro", res.info)

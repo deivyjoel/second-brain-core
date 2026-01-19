@@ -9,4 +9,5 @@ __pycache__/
 # Archivos generados
 *.db
 *.log
+_uploads  # images
 

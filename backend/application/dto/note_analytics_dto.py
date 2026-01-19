@@ -3,6 +3,7 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class NoteAnalyticsDTO:
+    """DTO to transport note analytics data."""
     name: str
     created_at: datetime
     last_edited_at: datetime

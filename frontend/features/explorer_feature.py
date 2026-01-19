@@ -1,17 +1,21 @@
+import os
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter import filedialog
 from frontend.core.api_provider import ApiProvider
 from frontend.core.bus import Bus
+from tkinter import filedialog
 
 class ExplorerFeature(ttk.Frame):
-    # Constantes para evitar "magic strings"
     TYPE_THEME = "theme"
     TYPE_NOTE = "note"
+    TYPE_IMAGE = "image"
     TYPE_DUMMY = "dummy"
     
     ICON_THEME = "📁"
     ICON_NOTE = "📄"
-    DUMMY_TEXT = "No hay contenido wey"
+    ICON_IMAGE = "📸"
+    DUMMY_TEXT = "Sin contenido..."
 
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
@@ -25,12 +29,11 @@ class ExplorerFeature(ttk.Frame):
         self.load_root()
 
     # --- SETUP ---
-
     def _setup_ui(self):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-        self.tree = ttk.Treeview(self, show="tree", selectmode="browse")
+        self.tree = ttk.Treeview(self, show="tree", selectmode="extended")
         self.tree.grid(row=0, column=0, sticky="nsew")
         
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
@@ -39,46 +42,94 @@ class ExplorerFeature(ttk.Frame):
 
         self.tree.column("#0", width=250, minwidth=150)
 
-        # Menú Contextual para temas
-        self.menu = tk.Menu(self, tearoff=0)
-        self.menu.add_command(label="📈 Analiticas", command=self._get_details)
-        self.menu.add_separator()
-        self.menu.add_command(label=f"{self.ICON_NOTE} Nueva Nota", command=self._ui_new_note)
-        self.menu.add_command(label=f"{self.ICON_THEME} Nuevo Tema", command=self._ui_new_theme)
-        self.menu.add_separator()
-        self.menu.add_command(label="✏️ Renombrar", command=self._ui_start_rename)
-        self.menu.add_command(label="🗑️ Eliminar", command=self._ui_delete_item)
-        self.menu.add_command(label="🗺️ Mapa de estudio", command=self._generate_study_map)
+        # Context menu for themes
+        self.menu_theme = tk.Menu(self, tearoff=0)
+        self.menu_theme.add_command(label="📈 Analiticas", command=self._get_details)
+        self.menu_theme.add_separator()
+        self.menu_theme.add_command(label=f"{self.ICON_NOTE} Nueva Nota", command=self._ui_new_note)
+        self.menu_theme.add_command(label=f"{self.ICON_THEME} Nuevo Tema", command=self._ui_new_theme)
+        self.menu_theme.add_command(label=f"{self.ICON_IMAGE} Nueva Imagen", command=self._ui_new_image)
+        self.menu_theme.add_separator()
+        self.menu_theme.add_command(label="✏️ Renombrar", command=self._ui_start_rename)
+        self.menu_theme.add_command(label="🗑️ Eliminar", command=self._ui_delete_item)
 
-        # Menú contextual para notas
-        self.menu2 = tk.Menu(self, tearoff=0)
-        self.menu2.add_command(label="📈 Analiticas", command=self._get_details)
-        self.menu2.add_separator()
-        self.menu2.add_command(label="✏️ Renombrar", command=self._ui_start_rename)
-        self.menu2.add_command(label="🗑️ Eliminar", command=self._ui_delete_item)
+        # Context menu for notes
+        self.menu_note = tk.Menu(self, tearoff=0)
+        self.menu_note.add_command(label="📈 Analiticas", command=self._get_details)
+        self.menu_note.add_separator()
+        self.menu_note.add_command(label="✏️ Renombrar", command=self._ui_start_rename)
+        self.menu_note.add_command(label="🗑️ Eliminar", command=self._ui_delete_item)
 
-        # Menú para cuando se selecciona a la 'nada'
-        self.menu3 = tk.Menu(self, tearoff=0)
-        self.menu3.add_command(label=f"{self.ICON_NOTE} Nueva Nota", command=self._ui_new_note)
-        self.menu3.add_command(label=f"{self.ICON_THEME} Nuevo Tema", command=self._ui_new_theme)
-        self.menu3.add_command(label="🗺️ Mapa de estudio", command=self._generate_study_map)
+        # Menu for when 'nothing' is selected
+        self.menu_nothing = tk.Menu(self, tearoff=0)
+        self.menu_nothing.add_command(label=f"{self.ICON_NOTE} Nueva Nota", command=self._ui_new_note)
+        self.menu_nothing.add_command(label=f"{self.ICON_THEME} Nuevo Tema", command=self._ui_new_theme)
+        self.menu_nothing.add_command(label=f"{self.ICON_IMAGE} Nueva Imagen", command=self._ui_new_image)
+
+        # Menu for when 'image' is selected
+        self.menu_image = tk.Menu(self, tearoff=0)
+        self.menu_image.add_command(label="🗑️ Eliminar", command=self._ui_delete_item)
+        self.menu_image.add_command(label="✏️ Renombrar", command=self._ui_start_rename)
+        self.menu_image.add_separator()
+        self.menu_image.add_command(label="➜] Exportar", command=self._ui_export_image)
 
     def _setup_events(self):
         self.tree.bind("<<TreeviewOpen>>", self._on_treeview_expand)
         self.tree.bind("<Button-1>", self._on_left_click)
         self.tree.bind("<Button-3>", self._on_right_click)
-        
-    # --- HELPERS (Mejora de legibilidad) ---
 
+        #Nuevo comando...
+        self.tree.bind("<B1-Motion>", self._on_drag_motion)
+        self.tree.bind("<ButtonPress-1>", self._on_drag_start, add="+")
+        self.tree.bind("<ButtonRelease-1>", self._on_drag_finish, add="+")
+
+    # --- EVENTS MOUSE ---
+    def _on_left_click(self, event):
+        iid = self.tree.identify_row(event.y)
+        if iid and iid.startswith(self.TYPE_NOTE):
+            _, note_id = self._parse_iid(iid)
+            Bus.emit("OPEN_TAB_NOTE", note_id=note_id)
+        elif iid and iid.startswith(self.TYPE_IMAGE):
+            _, image_id = self._parse_iid(iid)
+            Bus.emit("OPEN_TAB_IMAGE", image_id=image_id)
+        elif not iid:
+            self.tree.selection_set(())
+            self.tree.focus("")
+
+    def _on_right_click(self, event):
+        iid = self.tree.identify_row(event.y)
+        current_selection = self.tree.selection()
+
+        if iid:
+            if iid not in current_selection:
+                self.tree.selection_set(iid)
+                self.tree.focus(iid)
+        else:
+            self.tree.selection_set(())
+            self.tree.focus("")
+
+        focused_iid = self.tree.identify_row(event.y)
+        tipo, _ = self._parse_iid(focused_iid)
+
+        if tipo == self.TYPE_THEME:
+            self.menu_theme.post(event.x_root, event.y_root)
+        elif tipo == self.TYPE_NOTE:
+            self.menu_note.post(event.x_root, event.y_root)
+        elif tipo == self.TYPE_IMAGE:
+            self.menu_image.post(event.x_root, event.y_root)
+        elif tipo is None:
+            self.menu_nothing.post(event.x_root, event.y_root)
+        
+    # --- HELPERS ---
     def _parse_iid(self, iid: str):
-        """Retorna (tipo, id) a partir de un iid 'tipo_id'."""
+        """ Returns (type, id) from an iid 'type_id'"""
         if not iid or "_" not in iid:
             return None, None
         parts = iid.split("_")
         return parts[0], int(parts[1])
 
     def _call_api(self, api_func, *args, **kwargs):
-        """Wrapper para manejar errores de API de forma centralizada."""
+        """wrapper to handle API errors centrally."""
         res = api_func(*args, **kwargs)
         if not res.successful:
             messagebox.showerror("Error", res.info or "Error desconocido")
@@ -86,7 +137,7 @@ class ExplorerFeature(ttk.Frame):
         return res.obj
 
     def _manage_dummy(self, parent_iid, action="remove"):
-        """Gestiona la existencia del nodo dummy."""
+        """Manages the existence of the dummy node."""
         _, p_id = self._parse_iid(parent_iid)
         dummy_id = f"{self.TYPE_DUMMY}_{p_id}"
         
@@ -95,20 +146,23 @@ class ExplorerFeature(ttk.Frame):
         elif action == "add" and not self.tree.get_children(parent_iid):
             self.tree.insert(parent_iid, "end", iid=dummy_id, text=self.DUMMY_TEXT)
 
-    # --- LÓGICA DE CARGA ---
+    # --- LOADING LOGIC ---
     def load_root(self, **kwargs):
         self.tree.delete(*self.tree.get_children())
         self.loaded_nodes.clear()
         
         themes = self._call_api(self.api.list_root_themes)
         notes = self._call_api(self.api.get_notes_without_themes)
-
+        images = self._call_api(self.api.get_images_without_theme)
         if themes is not None:
             for t in themes: 
                 self.insert_theme("", t.id, t.name) 
         if notes is not None:
             for n in notes: 
                 self.insert_note("", n.id, n.name)
+        if images is not None:
+            for i in images: 
+                self.insert_image("", i.id, i.name)
 
     def _on_treeview_expand(self, event):
         iid = self.tree.focus()
@@ -121,34 +175,39 @@ class ExplorerFeature(ttk.Frame):
         _, p_id = self._parse_iid(parent_iid)
         res_themes = self._call_api(self.api.list_child_themes, p_id)
         res_notes = self._call_api(self.api.list_notes_by_theme, p_id)
-        print(res_themes)
-        print(res_notes)
-
-        if res_themes is not None and res_notes is not None:
-            if len(res_themes + res_notes) > 0:
+        res_images = self._call_api(self.api.list_images_by_theme, p_id)
+        if res_themes is not None and res_notes is not None and res_images is not None:
+            if len(res_themes + res_notes + res_images) > 0:
                 self._manage_dummy(parent_iid, "remove")
             
             for t in res_themes: 
                 self.insert_theme(parent_iid, t.id, t.name)
             for n in res_notes: 
                 self.insert_note(parent_iid, n.id, n.name)
+            for i in res_images:
+                self.insert_image(parent_iid, i.id, i.name)
             
             self.loaded_nodes.add(parent_iid)
 
     def insert_note(self, parent_iid, note_id, note_name):
+        """Inserts note in tkinter tree"""
         iid = f"{self.TYPE_NOTE}_{note_id}"
-        print(iid)
         self.tree.insert(parent_iid, "end", iid, text=f"{self.ICON_NOTE} {note_name}")
     
     def insert_theme(self, parent_iid, theme_id, theme_name):
+        """Inserts theme in tkinter tree"""
         iid = f"{self.TYPE_THEME}_{theme_id}"
-        print(iid)
         self.tree.insert(parent_iid, "end", iid, text=f"{self.ICON_THEME} {theme_name}")
         self._manage_dummy(iid, "add")
 
-    # --- OPERACIONES DE UI ---
+    def insert_image(self, parent_iid, img_id, img_name):
+        iid = f"{self.TYPE_IMAGE}_{img_id}"
+        self.tree.insert(parent_iid, "end", iid, text=f"{self.ICON_IMAGE} {img_name}")
+
+    # --- OPERATIONS UI ---
     def _ui_new_note(self):
         selected = self.tree.focus()
+        """The head node is loaded before a new note is created to avoid errors."""
         self.tree.event_generate("<<TreeviewOpen>>")
         self.tree.item(selected, open=True)
 
@@ -174,11 +233,12 @@ class ExplorerFeature(ttk.Frame):
 
     def _ui_new_theme(self):
         selected = self.tree.focus()
+        """The head node is loaded before a new theme is created to avoid errors."""
         self.tree.event_generate("<<TreeviewOpen>>")
         self.tree.item(selected, open=True)
         _, parent_id = self._parse_iid(selected)
 
-        name = self._call_api(self.api.get_unique_theme_name, "Nuevo tema", parent_id)
+        name = self._call_api(self.api.get_unique_theme_name, "   Nuevo tema", parent_id)
         if name:
             theme_id = self._call_api(self.api.create_theme, name, parent_id)
             if theme_id:
@@ -196,40 +256,44 @@ class ExplorerFeature(ttk.Frame):
                 self.tree.see(f"{self.TYPE_THEME}_{theme_id}")
                 self._ui_start_rename()
 
-    def _ui_delete_item(self):
-        iid = self.tree.focus()
-        item_type, item_id = iid.split("_")
+    def _ui_new_image(self):
+        selected = self.tree.focus()
+        self.tree.event_generate("<<TreeviewOpen>>")
+        self.tree.item(selected, open=True)
+        _, parent_id = self._parse_iid(selected)
+
+        file_path = filedialog.askopenfilename(
+            title="Seleccionar imagen",
+            filetypes=[("Archivos de imagen", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp"), ("Todos los archivos", "*.*")]
+        )
+        if not file_path:
+            return
+
+        name_image = file_path.split("/")[-1]
+
+        unique_name = self._call_api(self.api.get_unique_image_name, name_image, parent_id)
+        if unique_name:
+            with open(file_path, "rb") as f:
+                blob_data = f.read()
+            extension = os.path.splitext(file_path)[1][1:]
+            image_id = self._call_api(self.api.create_image, unique_name, blob_data, extension, parent_id)
+            if image_id:
+                if selected not in self.loaded_nodes and parent_id: 
+                    return
+                
+                if parent_id: 
+                    self._manage_dummy(selected, "remove")
+
+                self.insert_image(selected if parent_id else "", image_id, unique_name)
+                self.tree.selection_set(f"{self.TYPE_IMAGE}_{image_id}")
+
+                self.tree.focus(f"{self.TYPE_IMAGE}_{image_id}")
+
+                self.tree.see(f"{self.TYPE_IMAGE}_{image_id}")
+                file_path = self.api.get_image_details(image_id)
+                if not file_path.obj: return
+                self._ui_start_rename()
         
-        if item_type == self.TYPE_NOTE:
-            msg="¿Deseas eliminar la nota?"
-        elif item_type == self.TYPE_THEME:
-            msg="¿Deseas eliminar el tema?\n(Esto eliminará también todo su contenido)"
-        else:
-            msg = ""
-        if messagebox.askyesno("Confirmar", msg):
-
-            api_func = self.api.delete_note if item_type == self.TYPE_NOTE else self.api.delete_theme
-
-            res2 = False
-            if item_type == self.TYPE_THEME:
-                res2 = self._call_api(self.api.get_notes_descendants, int(item_id))
-
-            res = api_func(int(item_id))
-            if not res.successful:
-                messagebox.showerror("Error", res.info)
-
-            if item_type == self.TYPE_NOTE:
-                Bus.emit("DELETE_NOTE", note_id=int(item_id))
-            if item_type == self.TYPE_THEME:
-                if res2:
-                    Bus.emit("DELETE_NOTES", list_note_ids = res2)
-
-            parent_iid = self.tree.parent(iid)
-            self.tree.delete(iid)
-                
-            if parent_iid:
-                self._manage_dummy(parent_iid, "add")
-                
     def _ui_start_rename(self):
         iid = self.tree.focus()
         if not iid or iid.startswith(self.TYPE_DUMMY): 
@@ -244,10 +308,10 @@ class ExplorerFeature(ttk.Frame):
         entry.place(x=x, y=y, width=w, height=h)
         
         current_full_text = self.tree.item(iid, "text")
-        clean_text = current_full_text.replace(self.ICON_THEME, "").replace(self.ICON_NOTE, "").strip()
+        clean_text = current_full_text.replace(self.ICON_THEME, "").replace(self.ICON_NOTE, "").replace(self.ICON_IMAGE, "").strip()
         
         entry.insert(0, clean_text)
-        entry.select_range(0, tk.END) # Selecciona todo para facilitar el cambio
+        entry.select_range(0, tk.END)
         entry.focus_set()
 
         self.flag = False
@@ -259,46 +323,50 @@ class ExplorerFeature(ttk.Frame):
             if item_id is None:
                 return
             
-            # Si el nombre es vacío o no cambió, simplemente cerramos el entry
             if not new_name or new_name == clean_text:
                 entry.destroy()
                 return
 
-            # Elegir función de API
             self.flag = True
-            api_func = self.api.rename_note if item_type == self.TYPE_NOTE else self.api.rename_theme
+            if item_type == self.TYPE_THEME:
+                api_func = self.api.rename_theme
+            elif item_type == self.TYPE_IMAGE:
+                api_func = self.api.rename_image
+            else:
+                api_func = self.api.rename_note
             
-            # Ejecución directa evaluando OperationResult
             res = api_func(item_id, new_name)
             
             if res.successful:
-                # Actualizar la interfaz de Tkinter
-                icon = self.ICON_THEME if item_type == self.TYPE_THEME else self.ICON_NOTE
+                icon = ""
+                if item_type == self.TYPE_NOTE:
+                    icon = self.ICON_NOTE
+                elif item_type == self.TYPE_IMAGE:
+                    icon = self.ICON_IMAGE
+                elif item_type == self.TYPE_THEME:
+                    icon = self.ICON_THEME
+
                 full_text = f"{icon} {new_name}"
                 self.tree.item(iid, text=full_text)
                 
-                # Notificar al resto del sistema si es una nota
                 if item_type == self.TYPE_NOTE:
-                    Bus.emit("CHANGE_NOTE_NAME", note_id=item_id, new_name=new_name)
-                
+                    Bus.emit("CHANGE_NAME_NOTE_TAB", note_id=item_id, new_name=new_name)
+                elif item_type == self.TYPE_IMAGE:
+                    Bus.emit("CHANGE_NAME_IMAGE_TAB", image_id=item_id, new_name=new_name)
+
                 entry.destroy()
             else:
-                # Si falló la DB, mostramos el error y NO destruimos el entry 
-                # para que el usuario pueda corregir el nombre
                 messagebox.showerror("Error al renombrar", res.info or "Error desconocido")
                 self.flag = False
                 entry.focus_set()
 
         def on_focus_out(event):
-            print("alo?2|")
             if not self.flag:
                 entry.destroy()
 
-        # 3. Bindings
         entry.bind("<Return>", save_rename)
         entry.bind("<Escape>", lambda e: entry.destroy())
         
-        # El FocusOut destruye el entry si el usuario hace clic en otro lado
         entry.bind("<FocusOut>", on_focus_out)
 
     def _get_details(self): 
@@ -318,40 +386,282 @@ class ExplorerFeature(ttk.Frame):
             dto_analytics = self._call_api(call, int(item_id))
             if dto_analytics:
                 Bus.emit("OPEN_DETAILS_ITEM", dto_analytics = dto_analytics)
-                print("alo?")
 
+    def _ui_delete_item(self):
+        raw_selected = self.tree.selection()
+        if not raw_selected:
+            return
 
-    # --- EVENTOS DE MOUSE ---
-    def _on_left_click(self, event):
-        iid = self.tree.identify_row(event.y)
-        if iid and iid.startswith(self.TYPE_NOTE):
-            _, note_id = self._parse_iid(iid)
-            Bus.emit("OPEN_NOTE", note_id=note_id)
-        elif not iid:
-            self.tree.selection_set(())
-            self.tree.focus("")
+        # Filtred raw_selected to remove redundant selections
+        selected_items: list[str] = []
+        for iid in raw_selected:
+            is_redundant = False
+            parent = self.tree.parent(iid)
+            while parent:
+                if parent in raw_selected:
+                    is_redundant = True
+                    break
+                parent = self.tree.parent(parent)
+            
+            if not is_redundant:
+                selected_items.append(iid)
 
-    def _on_right_click(self, event):
-        iid = self.tree.identify_row(event.y)
-        tipo, _ = self._parse_iid(iid)
+        note_ids_to_delete: list[int] = []
+        theme_ids_to_delete: list[int] = []
+        image_ids_to_delete: list[int] = []
 
-        if iid:
-            self.tree.selection_set(iid)
-            self.tree.focus(iid)
+        for iid in selected_items:
+            item_type, item_id = self._parse_iid(iid)
+            if item_type is None or item_id is None: continue
+            elif item_type == self.TYPE_NOTE:
+                note_ids_to_delete.append(item_id)
+            elif item_type == self.TYPE_THEME:
+                theme_ids_to_delete.append(item_id)
+            elif item_type == self.TYPE_IMAGE:
+                image_ids_to_delete.append(item_id)
+        
+        total_items = len(selected_items)
 
+        # --- Dinamic about the message ---
+        if total_items == 1:
+            iid = selected_items[0]
+            name = self.tree.item(iid, 'text')
+            item_type, _ = self._parse_iid(iid)
+            
+            if item_type == self.TYPE_NOTE:
+                msg = f"¿Deseas eliminar la nota '{name}'?"
+            elif item_type == self.TYPE_IMAGE:
+                msg = f"¿Deseas eliminar la imagen '{name}'?"
+            else:
+                msg = f"¿Deseas eliminar el tema '{name}' y todo su contenido?"
         else:
-            self.tree.selection_set(())
-            self.tree.focus("")
+            msg = f"¿Deseas eliminar los {total_items} elementos seleccionados?\n\n"
+            
+            if note_ids_to_delete:
+                msg += f"NOTAS ({len(note_ids_to_delete)}):\n"
+                for nid in note_ids_to_delete[:5]:
+                    name = self.tree.item(f"{self.TYPE_NOTE}_{nid}", "text")
+                    msg += f" • {name}\n"
+                if len(note_ids_to_delete) > 5: msg += " ... y más.\n"
+                msg += "\n"
 
+            if theme_ids_to_delete:
+                msg += f"TEMAS Y SU CONTENIDO ({len(theme_ids_to_delete)}):\n"
+                for tid in theme_ids_to_delete[:5]:
+                    name = self.tree.item(f"{self.TYPE_THEME}_{tid}", "text")
+                    msg += f" • {name}\n"
+                if len(theme_ids_to_delete) > 5: msg += " ... y más.\n"
 
-        if tipo == self.TYPE_THEME:
-            self.menu.post(event.x_root, event.y_root)
-        elif tipo == self.TYPE_NOTE:
-            self.menu2.post(event.x_root, event.y_root)
-        elif tipo is None:
-            self.menu3.post(event.x_root, event.y_root)
-    
-    def _generate_study_map(self):...
+            if image_ids_to_delete:
+                msg += f"\nIMÁGENES ({len(image_ids_to_delete)}):\n"
+                for iid in image_ids_to_delete[:5]:
+                    name = self.tree.item(f"{self.TYPE_IMAGE}_{iid}", "text")
+                    msg += f" • {name}\n"
+                if len(image_ids_to_delete) > 5: msg += " ... y más.\n"
 
+        if not messagebox.askyesno("Confirmar", msg):
+            return
+        
+        if note_ids_to_delete:
+            res_delete_n = self.api.delete_many_notes(note_ids_to_delete)
+            if not res_delete_n.successful:
+                messagebox.showerror("Error", res_delete_n.info or "Error desconocido")
+            else:
+                Bus.emit("CLOSE_TAB_NOTES", list_note_ids=note_ids_to_delete)
 
+        if theme_ids_to_delete:
+            notes_tab_to_delete: list[int] = []
+            images_tab_to_delete: list[int] = []
 
+            for theme_id in theme_ids_to_delete:
+                res_get_n = self.api.get_note_ids_by_theme_hierarchy(theme_id)
+                if res_get_n.successful and res_get_n.obj:
+                    notes_tab_to_delete.extend(res_get_n.obj)
+
+                res_get_i = self.api.get_image_ids_by_theme_hierarchy(theme_id)
+                if res_get_i.successful and res_get_i.obj:
+                    images_tab_to_delete.extend(res_get_i.obj)
+            
+            res_delete_t = self.api.delete_many_themes(theme_ids_to_delete)
+            
+            if not res_delete_t.successful:
+                messagebox.showerror("Error", res_delete_t.info or "Error desconocido")
+            else:
+                Bus.emit("CLOSE_TAB_NOTES", list_note_ids=notes_tab_to_delete)
+                Bus.emit("CLOSE_TAB_IMAGES", list_image_ids=images_tab_to_delete)
+            
+
+        if image_ids_to_delete:
+            res = self.api.delete_many_images(image_ids_to_delete)
+            if not res.successful:
+                messagebox.showerror("Error", res.info or "Error desconocido")
+            else:
+                Bus.emit("CLOSE_TAB_IMAGES", list_image_ids=image_ids_to_delete)
+
+        for iid in selected_items:
+            parent_iid = self.tree.parent(iid)
+            self.tree.delete(iid)
+                
+            if parent_iid:
+                self._manage_dummy(parent_iid, "add")
+        
+# --- DRAG & DROP LOGIC ---
+    def _on_drag_motion(self, event):
+        """Visual effect while dragging."""
+        if not self.dragging_item:
+            return
+        self.tree.tag_configure(
+        "celeste_claro",
+        background="#5c9fe6",
+        foreground="black"
+        )
+        self.tree.item(self.dragging_item, tags=("celeste_claro",))
+        target_iid = self.tree.identify_row(event.y)
+        
+        # Clean previous highlights 
+        self.tree.selection_set(target_iid) 
+        
+        if target_iid == self.dragging_item:
+            self.tree.config(cursor="")
+        else:
+            self.tree.config(cursor="hand2")
+
+    def _on_drag_start(self, event):
+        """Detects what item is being started to drag."""
+        iid = self.tree.identify_row(event.y)
+        if iid and not iid.startswith(self.TYPE_DUMMY):
+            self.dragging_item = iid
+            self.tree.config(cursor="hand2")
+
+    def _on_drag_finish(self, event):
+        """Detects where it was dropped and executes the parent change."""
+        if not self.dragging_item:
+            return
+        self.tree.config(cursor="") 
+        
+        # Identify target
+        target_iid = self.tree.identify_row(event.y)
+
+        # Identify source
+        source_iid = self.dragging_item
+
+        # Clean dragging state and visual effects
+        self.dragging_item = None 
+        self.tree.item(source_iid, tags=())
+
+        if source_iid == target_iid:
+            return
+
+        dest_parent_iid = ""
+        if target_iid:
+            t_type, _ = self._parse_iid(target_iid)
+            if t_type == self.TYPE_THEME:
+                dest_parent_iid = target_iid
+            elif t_type == self.TYPE_NOTE:
+                dest_parent_iid = self.tree.parent(target_iid)
+            elif t_type == self.TYPE_IMAGE:
+                dest_parent_iid = self.tree.parent(target_iid)
+        
+        # Prevents moving to the same parent
+        parent_source_iid = self.tree.parent(source_iid)
+        if dest_parent_iid == parent_source_iid:
+            return
+
+        source_type, source_id = self._parse_iid(source_iid)
+        _, new_parent_id = self._parse_iid(dest_parent_iid)
+        if source_type is None or source_id is None:
+            return
+
+        """
+        The target node must be loaded to avoid losing its children in the change.
+        """
+        if dest_parent_iid != "":
+            self.tree.focus(dest_parent_iid)
+            self.tree.event_generate("<<TreeviewOpen>>")
+            self.tree.focus_set()
+
+        # Call API to perform the move 
+        if source_type == self.TYPE_THEME:
+            res = self.api.remove_theme(source_id, new_parent_id)
+            if not res.successful:
+                messagebox.showwarning("Movimiento no permitido", res.info or "No se pudo mover el elemento.")
+                return
+
+        elif source_type == self.TYPE_NOTE:
+            res = self.api.move_note_to_theme(source_id, new_parent_id)
+            if not res.successful:
+                messagebox.showwarning("Movimiento no permitido", res.info or "No se pudo mover el elemento.")
+                return
+        
+        elif source_type == self.TYPE_IMAGE:
+            res = self.api.move_image_to_theme(source_id, new_parent_id)
+            if not res.successful:
+                messagebox.showwarning("Movimiento no permitido", res.info or "No se pudo mover el elemento.")
+                return
+            
+
+        # Update the UI
+        old_parent = self.tree.parent(source_iid)
+
+        # If the destiny is not load and is not root.
+        if dest_parent_iid not in self.loaded_nodes and dest_parent_iid != "":
+            self.tree.delete(source_iid)
+            if old_parent:
+                self._manage_dummy(old_parent, "add")
+
+        # If the destiny is not load and is root
+        if dest_parent_iid not in self.loaded_nodes and dest_parent_iid == "":
+            self.tree.move(source_iid, dest_parent_iid, "end")
+            if old_parent:
+                self._manage_dummy(old_parent, "add")
+        
+        # If the destiny is load
+        if dest_parent_iid in self.loaded_nodes:
+            self.tree.move(source_iid, dest_parent_iid, "end")
+            if old_parent:
+                self._manage_dummy(old_parent, "add")
+  
+            self._manage_dummy(dest_parent_iid, "remove")
+ 
+    def _ui_export_image(self):
+        selected = self.tree.focus()
+        if not selected: 
+            return
+
+        item_type, image_id = self._parse_iid(selected)
+        if item_type != self.TYPE_IMAGE:
+            return
+        if image_id is None:
+            return
+
+        res = self.api.get_image_details(image_id)
+        if not res.successful or not res.obj:
+            messagebox.showerror("Error", res.info or "No se pudo recuperar la imagen")
+            return
+
+        image_dto = res.obj 
+        
+        res = self.api.get_image_extension(image_id)
+        if not res.successful or res.obj is None:
+            messagebox.showerror("Error", res.info or "No se pudo obtener el formato de la imagen.")
+            return
+        extension = "." + res.obj
+        file_path = filedialog.asksaveasfilename(
+            title="Exportar imagen",
+            initialfile=image_dto.name,
+            defaultextension=extension,
+            filetypes=[("Imagen", f"*{extension}"), ("Todos los archivos", "*.*")]
+        )
+
+        if not file_path:
+            return
+
+        try:
+            with open(image_dto.file_path, "rb") as f:
+                blob_data = f.read()
+            with open(file_path, "wb") as f:
+                f.write(blob_data)
+
+            messagebox.showinfo("Éxito", f"Imagen exportada correctamente en:\n{file_path}")
+        except Exception as e:
+            messagebox.showerror("Error de escritura", f"No se pudo guardar el archivo: {str(e)}")

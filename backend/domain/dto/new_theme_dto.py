@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from datetime import datetime
-
 
 @dataclass(frozen=True)
 class NewThemeDTO:
+    """DTO for transporting new theme data to the repository."""
     name: str
     parent_id: int | None
 

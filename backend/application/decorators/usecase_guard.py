@@ -1,12 +1,16 @@
+from log import logger
+from pydantic import ValidationError
 from functools import wraps
-from backend.domain.errors.note_errors import NoteDomainError
+
 from backend.infrastructure.errors.db import DBError
+
 from backend.application.results.operation_result import OperationResult
+from backend.application.decorators.validator_types import validate_types
+
 from backend.domain.errors.note_errors import NoteDomainError
 from backend.domain.errors.theme_errors import ThemeDomainError
+from backend.domain.errors.image_errors import ImageDomainError
 
-from pydantic import ValidationError
-from backend.application.decorators.validator import validate_types
 
 
 def handle_usecase_errors(f):
@@ -31,10 +35,17 @@ def handle_usecase_errors(f):
         except ThemeDomainError as e:
             return OperationResult(False, str(e), None)
         
+        except ImageDomainError as e:
+            return OperationResult(False, str(e), None)
+        
         except DBError:
             return OperationResult(False, "Error de base de datos", None)
         
-        except Exception:
+        except Exception as e:
+            logger.exception(
+                "Error inesperado en use case",
+                extra={"usecase": f.__name__}
+            )
             return OperationResult(False, "Ocurrió un error interno", None)
         
     return wrapper

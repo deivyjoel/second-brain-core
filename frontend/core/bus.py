@@ -1,22 +1,20 @@
 class Bus:
     """
-    Sistema de suscripción/publicación (PubSub) para que las 
-    features se comuniquen de forma reactiva.
+    Subscription/publishing system so that 
+    features are communicated reactively.
     """
     _subscribers = {}
 
     @classmethod
     def subscribe(cls, event_name: str, callback):
-        """Una feature se suscribe a un evento."""
+        """Subscribe a function to a specific event."""
         if event_name not in cls._subscribers:
             cls._subscribers[event_name] = []
         cls._subscribers[event_name].append(callback)
-        """
-        LOAD_ROOT : [callback1, callback2, callback3]
-        """
 
     @classmethod
     def unsubscribe(cls, event_name: str, callback):
+        """Remove a function from an event's subscriber list."""
         if event_name in cls._subscribers:
             try:
                 cls._subscribers[event_name].remove(callback)
@@ -25,18 +23,12 @@ class Bus:
             
     @classmethod
     def emit(cls, event_name: str, **kwargs):
-        """Una feature lanza un evento con datos."""
+        """Trigger an event and send data to all its subscribers."""
         if event_name in cls._subscribers:
             for callback in cls._subscribers[event_name]:
                 callback(**kwargs)
-        """
-        event_name ?= LOAD_ROOT
-        for [callback1, callback3, callback3] in LOAD_ROOT(**KWARGS)
-        """
-
-    
 
     @classmethod
     def clear(cls):
-        """Limpia todas las suscripciones (útil para tests)."""
+        """Remove all subscriptions."""
         cls._subscribers = {}

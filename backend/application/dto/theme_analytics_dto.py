@@ -3,6 +3,7 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class ThemeAnalyticsDTO:
+    """DTO to transport theme analytics data."""
     name: str
     created_at: datetime
     last_edited_at: datetime

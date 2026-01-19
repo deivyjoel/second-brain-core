@@ -1,21 +1,23 @@
+from datetime import datetime, timezone
+
 from backend.infrastructure.repositories.note_repository import NoteRepository
 from backend.infrastructure.repositories.theme_repository import ThemeRepository
-from backend.infrastructure.repositories.time_repository import TimeRepository
 from backend.infrastructure.repositories.search_efficiency_repository import SearchEfficiencyRepository
-
-from backend.domain.models.note import Note
-from backend.domain.dto.new_note_dto import NewNoteDTO
 
 from backend.application.decorators.usecase_guard import handle_usecase_errors
 from backend.application.results.operation_result import OperationResult
 from backend.application.dto.note_summary_dto import NoteSummaryDTO
 from backend.application.dto.note_details_dto import NoteDetailDTO
 from backend.application.dto.note_analytics_dto import NoteAnalyticsDTO
-
-from backend.application.services.analyzer_services import AnalyzerService
-from datetime import datetime, timezone
 from backend.application.services.note_services import NoteService
+from backend.application.services.analyzer_services import AnalyzerService
 
+from backend.domain.models.note import Note
+from backend.domain.dto.new_note_dto import NewNoteDTO
+
+
+
+# --- OPERATIONS ---
 @handle_usecase_errors
 def create_note(note_repo: NoteRepository, 
                 note_services: NoteService,
@@ -33,6 +35,11 @@ def delete_note(note_repo: NoteRepository, note_id: int) -> OperationResult[None
         return OperationResult(False, "No se pudo eliminar la nota porque no existe", None)
     note_repo.delete(note_id)
     return OperationResult(True, "Nota eliminada correctamente", None)
+
+@handle_usecase_errors
+def delete_many_notes(note_repo: NoteRepository, note_ids: list[int]) -> OperationResult[None]:
+    note_repo.delete_many(note_ids)
+    return OperationResult(True, "Notas eliminadas correctamente", None)
 
 @handle_usecase_errors
 def rename_note(note_repo: NoteRepository, 
@@ -59,7 +66,6 @@ def move_to_theme(note_repo: NoteRepository,
         theme = theme_repo.get_by_id(new_theme_id)
         if not theme:
             return OperationResult(False, "No se pudo cambiar el tema de la nota porque el tema dado es inexistente", None)
-        
     sibling_names = note_service.get_names_in_theme_id(new_theme_id)
     note.change_theme_id(new_theme_id, set(sibling_names))
     note_repo.update(note)
@@ -70,22 +76,24 @@ def update_note_content(note_repo: NoteRepository, note_id: int, content: str) -
     note = note_repo.get_by_id(note_id)
     if not note:
         return OperationResult(False, "No se pudo actualizar el contenido de la nota porque no existe", None)
+    """The time must be in UTC."""
     now = datetime.now(timezone.utc)
     note.set_content(content, now)
     note_repo.update(note)
     return OperationResult(True, "Contenido agregado a la nota", None)
 
 @handle_usecase_errors
-def register_time_to_note(note_repo: NoteRepository, 
-                time_repo: TimeRepository,
-                minutes: float, note_id: int) -> OperationResult[int]:
+def register_time_to_note(
+    note_repo: NoteRepository, 
+                minutes: float, note_id: int) -> OperationResult[None]:
     note = note_repo.get_by_id(note_id)
     if not note:
         return OperationResult(False, "No se pudo registrar un tiempo porque la nota dada no existe", None)
+    #UTC
     now = datetime.now(timezone.utc)
     note.add_minutes(minutes, now)
-    time_id = time_repo.add(minutes=minutes, note_id=note_id)
-    return OperationResult(True, "Se creó el tiempo correctamente", time_id)
+    note_repo.add_time_record(note_id, minutes)
+    return OperationResult(True, "Se creó el tiempo correctamente", None)
 
 # ------ QUERIES -----
 @handle_usecase_errors
@@ -101,7 +109,7 @@ def get_unique_note_name(
     return OperationResult(True, "", u_name)
 
 @handle_usecase_errors
-def get_notes_descendants(theme_id: int, search_repo: SearchEfficiencyRepository) -> OperationResult[list[int]]:
+def get_note_ids_by_theme_hierarchy(theme_id: int, search_repo: SearchEfficiencyRepository) -> OperationResult[list[int]]:
     ids_notes = search_repo.get_notes_from_theme_and_descendants(theme_id)
     return OperationResult(True, "", ids_notes)
 
@@ -144,8 +152,7 @@ def get_notes_without_themes(note_repo: NoteRepository) -> OperationResult[list[
                                "listadas", notes_dto)
 
 @handle_usecase_errors
-def get_note_analytics(time_repo: TimeRepository, 
-                       note_repo: NoteRepository, 
+def get_note_analytics(note_repo: NoteRepository, 
                        analyzer_service: AnalyzerService,
                        note_id: int) -> OperationResult[NoteAnalyticsDTO]:
     
@@ -153,11 +160,10 @@ def get_note_analytics(time_repo: TimeRepository,
     if not note:
         return OperationResult(False, "No se pudo obtener las analiticas de la nota porque la nota dada es inexistente", None)
     
-    # Métricas de tiempo
-    n_sessions = time_repo.count_by_note(note_id)
-    n_days_active = time_repo.count_active_days_by_note(note_id)
-    
-    # Análisis de texto con nombres cortos
+
+    n_sessions = note_repo.get_time_records_count(note_id)
+    n_days_active = note_repo.get_active_days_count(note_id)
+
     text = note._content
     n_words_total = analyzer_service.count_total(text)
     n_meaningful = analyzer_service.count_meaningful(text)
@@ -179,6 +185,6 @@ def get_note_analytics(time_repo: TimeRepository,
     
     return OperationResult(True, "Success", obj=note_analytics)
 
-    
+
     
     

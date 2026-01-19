@@ -1,20 +1,22 @@
+from datetime import datetime, timezone
+
 from backend.infrastructure.repositories.theme_repository import ThemeRepository
 from backend.infrastructure.repositories.analytics_repository import AnalyticsRepository
 from backend.infrastructure.repositories.search_efficiency_repository import SearchEfficiencyRepository
+
 from backend.application.decorators.usecase_guard import handle_usecase_errors
-
-from backend.domain.models.theme import Theme
-
 from backend.application.dto.theme_details_dto import ThemeDetailDTO
 from backend.application.results.operation_result import OperationResult
 from backend.application.dto.theme_summary_dto import ThemeSummaryDTO
 from backend.application.services.analyzer_services import AnalyzerService
 from backend.application.dto.theme_analytics_dto import ThemeAnalyticsDTO
 from backend.application.services.theme_services import ThemeService
-from datetime import datetime, timezone
+
+from backend.domain.models.theme import Theme
 
 
-# --- Theme Operations ---
+
+# --- OPERATIONS ---
 @handle_usecase_errors
 def create_theme(
     theme_repo: ThemeRepository,
@@ -39,6 +41,12 @@ def delete_theme(theme_repo: ThemeRepository, theme_id: int) -> OperationResult[
                                 obj=None)            
 
 @handle_usecase_errors
+def delete_many_themes(theme_repo: ThemeRepository, theme_ids: list[int]) -> OperationResult[None]:
+    theme_repo.delete_many(theme_ids)
+    return OperationResult(True, "Temas eliminados correctamente", None)
+
+
+@handle_usecase_errors
 def rename_theme(theme_repo: ThemeRepository,
                  theme_service: ThemeService, 
                 theme_id: int, new_name: str) -> OperationResult[None]:
@@ -47,7 +55,7 @@ def rename_theme(theme_repo: ThemeRepository,
         return OperationResult(False, "No se pudo renombrar el tema porque no existe", None)
 
     names_in_theme = theme_service.get_names_in_theme_id(theme._parent_id)
-    print(names_in_theme)
+    #UTC
     now = datetime.now(timezone.utc)
     theme.change_name(new_name, set(names_in_theme), now)
     theme_repo.update(theme)
@@ -65,7 +73,7 @@ def remove_theme(theme_repo: ThemeRepository,
     if not theme:
         return OperationResult(False, "No se pudo cambiar el tema padre del tema hijo porque el tema hijo no existe", None)
 
-    if new_parent_id:
+    if new_parent_id is not None:
         parent_theme = theme_repo.get_by_id(new_parent_id)
         if not parent_theme:
             return OperationResult(False, "No se pudo cambiar el tema padre del tema hijo porque el tema padre es inexistente", None)
@@ -75,7 +83,7 @@ def remove_theme(theme_repo: ThemeRepository,
 
     theme.change_parent_id(new_parent_id, set(names_in_theme), descendients)
     theme_repo.update(theme)
-    return OperationResult(successful=True, info="Se cambió el nombre del tema correctamente", obj=None)
+    return OperationResult(successful=True, info="Se cambió el padre del tema correctamente", obj=None)
 
 
 # ------ QUERIES -----

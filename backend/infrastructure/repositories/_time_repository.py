@@ -1,13 +1,14 @@
 from log import logger
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy import func
+
 from backend.infrastructure.repositories.sql_alchemy import models
 from backend.infrastructure.errors.db import RepositoryError, UniqueConstraintViolation
-
 
 class TimeRepository:
     def __init__(self, session):
         self.session = session
+
         logger.info("TimeRepository initialized succesfully: %s", session)
 
     # --- CRUD ---
@@ -30,7 +31,7 @@ class TimeRepository:
             self.session.rollback()
             logger.exception("add(minutes=%s, note_id=%s) [Unexpected error]", round(minutes, 3), note_id)
             raise RepositoryError("unexpected_error") from e
-        
+
     def count_by_note(self, note_id: int) -> int:
         try:
             count = (
@@ -39,7 +40,7 @@ class TimeRepository:
                 .filter(models.TimeModel.note_id == note_id)
                 .scalar()
             )
-            logger.info("count_by_note(id=%s) [Success]", note_id)
+            logger.info("count_by_note(id=%s) [Success] - %d times found", note_id, count if count else 0)
             return count or 0
         except SQLAlchemyError as e:
             logger.exception("count_by_note(id=%s) [SQLAlchemyError]: %s", note_id, e)
@@ -67,7 +68,7 @@ class TimeRepository:
                 .scalar()
             )
 
-            logger.info("count_active_days_by_note(id=%s) [Success]", note_id)
+            logger.info("count_active_days_by_note(id=%s) - %d times found", note_id, count if count else 0)
             return count or 0
         except SQLAlchemyError as e:
             logger.exception(

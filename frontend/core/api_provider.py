@@ -2,19 +2,18 @@ from backend.application.backend_api import BackendAPI
 
 class ApiProvider:
     """
-    Service Locator para centralizar el acceso al backend/fachada.
-    Evita el 'prop drilling' (pasar el backend por todos los constructores).
+    Service locator to centralize access to the backend.
     """
     _instance = None
 
     @classmethod
     def set(cls, api_instance: BackendAPI):
-        """Inyecta la instancia real del backend al inicio de la app."""
+        """Store the backend instance to be used globally."""
         cls._instance = api_instance
 
     @classmethod
     def get(cls):
-        """Devuelve la instancia del backend."""
+        """Retrieve the stored backend instance or raise an error if not set."""
         if cls._instance is None:
-            raise Exception("ApiProvider: Debes inicializar el API antes de usarlo (ApiProvider.set).")
+            raise Exception("ApiProvider: The API must be initialized before use (ApiProvider.set).")
         return cls._instance

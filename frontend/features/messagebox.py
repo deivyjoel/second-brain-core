@@ -1,17 +1,12 @@
 import tkinter as tk
 
 def custom_messagebox(title: str, message: str, options: list[str]) -> str | None:
-    """
-    Muestra un cuadro de diálogo modal con botones personalizados.
-    Retorna el texto del botón presionado.
-    """
     dialog = tk.Toplevel()
     dialog.title(title)
     dialog.geometry("360x150")
     dialog.resizable(False, False)
     dialog.grab_set()  # MODAL
 
-    # Centrado dentro de la ventana principal
     dialog.update_idletasks()
     x = dialog.winfo_screenwidth() // 2 - 180
     y = dialog.winfo_screenheight() // 2 - 75
