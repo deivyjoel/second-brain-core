@@ -1,28 +1,45 @@
-# SecondBrain
+# 🧠 SecondBrain - Personal Knowledge Manager
 
-## Descripcion:
-Aplicación para tomar notas y gestionar conocimiento personal.
+**SecondBrain** is a desktop application designed to capture notes, organize thoughts, and manage personal knowledge in a structured way, eliminating mental and digital clutter.
 
-## Tecnologias:
-- Python
-- Tkinter
-- SQite
-- SQLAlchemy
-- Pydantic
-- Pillow
+---
 
-## Funcionalidades:
-- Nota con markdown básico integrado y con un cronometro linkeado a cada nota
-- Analíticas básicas de una nota
-- Importación / Exportación de imágenes
-- Gestión de notas e imagenes como base principal el tema. (Intento explicar que es como un gestor de archivos, donde los archivos son imagenes y notas y el folder, el tema.)
-- Analíticas básicas de un tema
+## ✨ Features
 
-## Para ejecutar:
-python -m main.py
+- **📝 Markdown Support:** Take notes with integrated basic Markdown formatting.
+- **⏱️ Time Tracking:** Each note includes a linked timer to track how much time you spend on each idea or task.
+- **📂 Topic-Based Organization:** A hierarchical management system where **Topics** act as containers (folders) for notes and images.
+- **🖼️ Media Management:** Integrated image import and export directly into your workflow.
+- **📊 Smart Analytics:** View basic statistics for both individual notes and entire topics.
 
-## Motivación
-Este proyecto surge de la necesidad de organizar mi conocimiento, pensamientos e ideas a través de las notas.
-Mi escritorio quedaba muy desordenado y disperso. 
-A partir de esta necesidad real, el proyecto fue diseñado también como un ejercicio consciente
-de buenas prácticas de arquitectura y separación de responsabilidades.
+## 🛠️ Tech Stack
+
+The project was built following **clean architecture** principles and separation of concerns:
+
+* **Language:** Python
+* **GUI:** Tkinter
+* **Database & ORM:** SQLAlchemy + SQLite
+* **Data Validation:** Pydantic
+* **Image Processing:** Pillow (PIL)
+
+---
+
+## 🚀 Installation & Running
+
+1. **Clone the repository:**
+   git clone https://github.com/deivyjoel/second-brain-core.git
+
+2. **Run the application:**
+   python -m main
+
+---
+
+## 💡 Motivation
+
+This project was born out of a personal need: **to organize the chaos**. My desktop and my ideas were scattered, and I needed a tool to centralize my thoughts in one place.
+
+Beyond solving a real productivity problem, **SecondBrain** is a conscious exercise in software engineering, where I applied best practices in architecture, component decoupling, and maintainable code.
+
+---
+
+Developed with ❤️ by [Deivy Joel](https://github.com/deivyjoel)
