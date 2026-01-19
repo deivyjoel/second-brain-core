@@ -18,7 +18,7 @@ The project was built following **clean architecture** principles and separation
 
 * **Language:** Python
 * **GUI:** Tkinter
-* **Database & ORM:** SQLAlchemy + SQLite
+* **Database:** SQLAlchemy + SQLite
 * **Data Validation:** Pydantic
 * **Image Processing:** Pillow (PIL)
 
