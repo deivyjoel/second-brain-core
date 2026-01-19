@@ -12,6 +12,7 @@ def setup_style():
 class Gui():
     def __init__(self):
         self.root = tk.Tk()
+        self.root.title("SecondBrain")
 
         setup_style()
         self.root.geometry("1000x600")
