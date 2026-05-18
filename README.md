@@ -66,4 +66,3 @@ Beyond solving a real productivity problem, **SecondBrain** is a conscious exerc
 ---
 
 Developed with ❤️ by [Deivy Joel](https://github.com/deivyjoel)
-# second-brain-core-web
